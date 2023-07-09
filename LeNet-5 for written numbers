@@ -1,0 +1,90 @@
+import torch 
+import torch.nn as nn
+import torch.optim as optim 
+from torchvision.datasets import MNIST 
+from torchvision.transforms import transforms 
+from torch.utils.data import DataLoader, Dataset 
+from PIL import Image 
+import numpy as np
+
+# 定义LeNet-5模型
+class LeNet5(nn.Module):
+    def __init__(self, num_classes):
+        super(LeNet5, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 6, kernel_size=5, padding=2), 
+            nn.ReLU(inplace=True), 
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(6, 16, kernel_size=5),
+            nn.ReLU(inplace=True), # 激活函数，使用ReLU函数
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(16 * 5 * 5, 120),
+            nn.ReLU(inplace=True), 
+            nn.Linear(120, 84), 
+            nn.ReLU(inplace=True),
+            nn.Linear(84, num_classes) 
+        )
+
+    def forward(self, x):
+        x = self.features(x) 
+        x = x.view(x.size(0), -1) 
+        x = self.classifier(x) 
+        return x
+
+# 设置训练参数
+batch_size = 64 
+learning_rate = 0.01 
+momentum = 0.9 # 
+num_epochs = 5 
+
+# 创建LeNet-5模型实例
+model = LeNet5(num_classes=10) 
+
+# 加载MNIST训练数据集
+train_transform = transforms.Compose([ 
+    transforms.ToTensor(), 
+    transforms.Normalize((0.1307,), (0.3081,)) 
+])
+train_dataset = MNIST(root='MNIST_data/', train=True, transform=train_transform, download=True)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+# 定义损失函数和优化器
+criterion = nn.CrossEntropyLoss() 
+optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+
+# 训练模型
+model.train()
+for epoch in range(num_epochs): 
+    for images, labels in train_dataloader: 
+        optimizer.zero_grad()
+        outputs = model(images) 
+        loss = criterion(outputs, labels) 
+        loss.backward() 
+        optimizer.step()
+    print("Epoch [{}/{}], Loss: {:.4f}".format(epoch+1, num_epochs, loss.item())) 
+
+# 测试单张图片的预测结果
+def predict_image(image_path, model):
+    transform = transforms.Compose([ 
+        transforms.Resize((28, 28)), 
+        transforms.ToTensor(), 
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+    image = Image.open(image_path).convert('L')  
+    image_tensor = transform(image).unsqueeze(0) 
+    with torch.no_grad(): 
+        model.eval()
+        output = model(image_tensor) 
+        _, predicted = torch.max(output, 1) 
+        return predicted.item() 
+
+# 测试本地图片集的预测结果
+test_images = [
+   本地图片路径
+]
+
+for i, image_path in enumerate(test_images):
+    predicted_label = predict_image(image_path, model) 
+    print("Image {}: Predicted: {}".format(i, predicted_label))
